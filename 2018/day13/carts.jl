@@ -1,6 +1,7 @@
 filename = "input.txt"
+println(ARGS)
 debug = false
-N = 10000
+N = 100000
 
 s = open(filename) do f
     [chomp(x) for x in readlines(f)]
@@ -47,7 +48,7 @@ turnplus = Dict('v'=>collect(">v<"),'^'=>collect("<^>"),
 
 function tick(carts)
     newcarts = []
-    for (x,y,c,n) in carts
+    for (i,(x,y,c,n)) in enumerate(carts)
 #         println(x,y,c,n)
         nx,ny = [x,y] + DIR[c]
         d = B[nx,ny]
@@ -62,14 +63,27 @@ function tick(carts)
         end
         if !(A[nx,ny] in collect("-/|\\+"))
             println("CRRRASH!! ",(nx,ny))
-            pretty(A[nx-2:nx+2,ny-2:ny+2])
-            A[nx,ny] = 'X'
+            # pretty(A[nx-2:nx+2,ny-2:ny+2])
+            if any([x[1:2] == [nx,ny] for x in newcarts])
+                j = findfirst(x -> x[1:2] == [nx,ny],newcarts)
+                deleteat!(newcarts,j)
+                println("Nipped new.")
+            else
+                j = findnext(x -> x[1:2] == [nx,ny],carts,i+1)
+                deleteat!(carts,j)
+                println("Nipped old.")
+            end
+            # if length(carts) <=1
+            #     break
+            # end
+            # A[nx,ny] = 'X'
             # nd = c
 #             break
+            A[nx,ny] = B[nx,ny]
         else
             A[nx,ny] = nd
+            push!(newcarts,[nx,ny,nd,n])
         end
-        push!(newcarts,[nx,ny,nd,n])
     end
     # cartsxy = Set([tuple(x[1:2]) for x in newcarts])
     
@@ -82,6 +96,10 @@ for x in 1:N
         pretty(A)
     end 
     carts = tick(carts)
+    if length(carts) <= 1
+        println(carts)
+        break
+    end
 end        
         
         
