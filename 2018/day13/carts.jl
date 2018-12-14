@@ -1,5 +1,5 @@
-filename = "test.txt"
-debug = true
+filename = "input.txt"
+debug = false
 N = 10000
 
 s = open(filename) do f
@@ -50,33 +50,37 @@ function tick(carts)
     for (x,y,c,n) in carts
 #         println(x,y,c,n)
         nx,ny = [x,y] + DIR[c]
-        d = A[nx,ny]
+        d = B[nx,ny]
         A[x,y] = B[x,y]
         if d in ('-','|')
             nd  = c
-            A[nx,ny] = nd
         elseif d in ('/','\\')
             nd = turnslashes[d][c]
-            A[nx,ny] = nd
         elseif d == '+'
             n = mod1((n + 1) , 3)
             nd = turnplus[c][n]
-            A[nx,ny] = nd
-        else
-            println(d,"CRRRASH!! ",(nx,ny))
-            # pretty(A[nx-2:nx+2,ny-2:ny+2])
+        end
+        if !(A[nx,ny] in collect("-/|\\+"))
+            println("CRRRASH!! ",(nx,ny))
+            pretty(A[nx-2:nx+2,ny-2:ny+2])
             A[nx,ny] = 'X'
-            nd = c
+            # nd = c
 #             break
+        else
+            A[nx,ny] = nd
         end
         push!(newcarts,[nx,ny,nd,n])
     end
+    # cartsxy = Set([tuple(x[1:2]) for x in newcarts])
+    
     return sort(newcarts)
 end
 
 for x in 1:N
     global carts
-    pretty(A) 
+    if debug
+        pretty(A)
+    end 
     carts = tick(carts)
 end        
         
