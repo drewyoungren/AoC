@@ -1,5 +1,5 @@
 filename = "input.txt"
-println(ARGS)
+# println(ARGS)
 debug = false
 N = 100000
 
