@@ -1,23 +1,30 @@
 filename = (length(ARGS) > 0 ? ARGS[1] : "test.txt")
 
+ATTACK_STRENGTH = 3
+
 debug = false
 
 s = open(filename) do f
     [chomp(x) for x in readlines(f)]    
 end
 
-A = [x[j] for x in s, j in 1:length(s[1])]
+A = [x[j] for j in 1:length(s[1]), x in s]
 
-function pretty(A)
+function pretty(A,P=P)
     for i in 1:size(A,2)
+        row_guys =[]
         for j in 1:size(A,1)
             print(A[j,i])
+            if A[j,i] in ('G','E')
+                pl = first([k for (k,v) in P if v["pos"] == CartesianIndex(j,i)])
+                push!(row_guys,pl)
+            end
         end
+        print([" " * string(P[pl]["hits"]) * " " for pl in row_guys]...)
         print("\n")
     end
 end
 
-pretty(A)
 
 playas = 1
 P = Dict{Int,Dict}()
@@ -28,6 +35,8 @@ for j in CartesianIndices(A)
         playas += 1
     end
 end
+
+pretty(A)
 
 CARDINALS=[CartesianIndex(0,-1),CartesianIndex(-1,0),CartesianIndex(1,0),CartesianIndex(0,1)]
 
@@ -46,15 +55,20 @@ end
 
 
 function find_paths(pos,out,A=A)
-    for d in CARDINALS
-        nd = pos + d
-        if !(nd in keys(out)) & (A[nd] == '.')
-            out[pos] = vcat(get(out,pos,[]),[nd])
-            out[nd] = []
+    layers = [[pos]]
+    while !isempty(layers[end])
+        push!(layers,[])
+        for x in layers[end - 1]
+            for d in CARDINALS
+                nd = x + d
+                if !(nd in union(layers...)) & (A[nd] == '.')
+                    push!(layers[end],nd)
+                    out[x] = vcat(get(out,x,[]),[nd])
+                    out[nd] = []
+                end
+            end
         end
-    end
-    for d in out[pos]
-        find_paths(d,out,A)
+        # println(layers)
     end
 end
 
@@ -91,6 +105,10 @@ function pretty_tree(out)
     end
 end
 
+function lookup_pos(pos,P=P)
+    return first([k for (k,v) in pairs(P) if v["pos"] == pos])
+end
+
 function tick(player,P=P,A=A)
     pos = player["pos"]
     enemy = ( player["ge"] == 'G' ? 'E' : 'G')
@@ -102,30 +120,42 @@ function tick(player,P=P,A=A)
         end
     end
 
-    if pos in rangs
-        println("Attack! ", pos)
+    if any([A[pos+d] == enemy for d in CARDINALS])
+        targets = [lookup_pos(pos + d) for d in CARDINALS if A[pos+d] == enemy]
+        m = minimum([P[x]["hits"] for x in targets])
+        other = lookup_pos(first(sort([P[x]["pos"] for x in targets if P[x]["hits"] == m])))
+        println("Attack! ", pos, " -> ", P[other]["pos"])
+        P[other]["hits"] += -ATTACK_STRENGTH
     else
         out = Dict()
         find_paths(pos,out,A)
 
-        pretty_tree(out)
+        # pretty_tree(out)
 
         r = sort([x for x in union(values(out)...) if x in rangs])
         println([(x[1],x[2]) for x in r]...)
 
         if length(r) > 0
             minimum_path  = lineage(out,r[1])
-            println(length(minimum_path)," ",[(x[1],x[2]) for x in minimum_path]...)
+            # println(length(minimum_path)," ",[(x[1],x[2]) for x in minimum_path]...)
             for d in r[2:end]
                 m = lineage(out,d)
                 if (length(m) < length(minimum_path) | ((length(m) == length(minimum_path)) & (m[2] < minimum_path[2])))
                     minimum_path = m 
                 end
-                println(length(m)," ",[(x[1],x[2]) for x in m]...)
+                # println(length(m)," ",[(x[1],x[2]) for x in m]...)
             end
-            player["pos"] = minimum_path[2]
             A[pos] = '.'
+            pos = minimum_path[2]
+            player["pos"] = pos
             A[minimum_path[2]] = player["ge"] 
+            if any([A[pos+d] == enemy for d in CARDINALS])
+                targets = [lookup_pos(pos + d) for d in CARDINALS if A[pos+d] == enemy]
+                m = minimum([P[x]["hits"] for x in targets])
+                other = lookup_pos(first(sort([P[x]["pos"] for x in targets if P[x]["hits"] == m])))
+                println("Attack! ", pos, " -> ", P[other]["pos"])
+                P[other]["hits"] += -ATTACK_STRENGTH
+            end
         end 
         
         
@@ -137,8 +167,12 @@ end
 
 pretty(A)
 
-for i in 1:length(P)
-    tick(P[i],P,A)
+for j = 1:7
+    for i in 1:length(P)
+        tick(P[i],P,A)
+        # pretty(A)
+        # println(i," ",P[i])
+    end
+    println("Round ",j)
     pretty(A)
-    println(i," ",P[i])
 end
