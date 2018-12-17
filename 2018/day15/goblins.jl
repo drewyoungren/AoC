@@ -1,5 +1,7 @@
 filename = (length(ARGS) > 0 ? ARGS[1] : "test.txt")
 
+debug = false
+
 s = open(filename) do f
     [chomp(x) for x in readlines(f)]    
 end
@@ -17,17 +19,13 @@ end
 
 pretty(A)
 
-gobs,elves = (1,1)
-G = Dict{Int,Dict}()
-E = Dict{Int,Dict}()
+playas = 1
+P = Dict{Int,Dict}()
 for j in CartesianIndices(A)
-    global gobs,elves
-    if A[j] == 'G'
-        G[gobs] = Dict("pos" => j,"hits" => 200)
-        gobs += 1
-    elseif A[j] == 'E'
-        E[elves] = Dict("pos" => j,"hits" => 200)
-        elves += 1
+    global playas
+    if A[j] in ['G','E']
+        P[playas] = Dict("ge" => A[j],"pos" => j,"hits" => 200)
+        playas += 1
     end
 end
 
@@ -40,8 +38,107 @@ end
 
 norm1(x::CartesianIndex) = sum(map(abs,Tuple(x)))
 
-for v in values(G)
-    println(v["pos"],norm1(v["pos"]),attack_range(v))
+if debug 
+    for v in values(P)
+        println(v["pos"],norm1(v["pos"]),attack_range(v))
+    end
 end
 
 
+function find_paths(pos,out,A=A)
+    for d in CARDINALS
+        nd = pos + d
+        if !(nd in keys(out)) & (A[nd] == '.')
+            out[pos] = vcat(get(out,pos,[]),[nd])
+            out[nd] = []
+        end
+    end
+    for d in out[pos]
+        find_paths(d,out,A)
+    end
+end
+
+
+function parent(tree,n)
+    for (k,v) in pairs(tree)
+        if n in v
+            return k
+        end
+    end
+    return 0
+end
+
+function lineage(tree,n)
+    out = [n]
+    p = parent(tree,n)
+    while p != 0
+        pushfirst!(out,p)
+        p = parent(tree,p)
+    end
+    return out
+end
+
+if debug
+    out = Dict()
+    find_paths(CartesianIndex(2,2),out,A)
+    # println(out)
+    println(lineage(out,CartesianIndex(7,2)))
+end
+function pretty_tree(out)
+    for (k,v) in pairs(out)
+        print((k[1],k[2]),": ")
+        println([(x[1],x[2]) for x in v]...)
+    end
+end
+
+function tick(player,P=P,A=A)
+    pos = player["pos"]
+    enemy = ( player["ge"] == 'G' ? 'E' : 'G')
+
+    rangs = []
+    for (p,v) in pairs(P) 
+        if v["ge"] == enemy
+            rangs = union(rangs, attack_range(v))
+        end
+    end
+
+    if pos in rangs
+        println("Attack! ", pos)
+    else
+        out = Dict()
+        find_paths(pos,out,A)
+
+        pretty_tree(out)
+
+        r = sort([x for x in union(values(out)...) if x in rangs])
+        println([(x[1],x[2]) for x in r]...)
+
+        if length(r) > 0
+            minimum_path  = lineage(out,r[1])
+            println(length(minimum_path)," ",[(x[1],x[2]) for x in minimum_path]...)
+            for d in r[2:end]
+                m = lineage(out,d)
+                if (length(m) < length(minimum_path) | ((length(m) == length(minimum_path)) & (m[2] < minimum_path[2])))
+                    minimum_path = m 
+                end
+                println(length(m)," ",[(x[1],x[2]) for x in m]...)
+            end
+            player["pos"] = minimum_path[2]
+            A[pos] = '.'
+            A[minimum_path[2]] = player["ge"] 
+        end 
+        
+        
+
+        # println(out)
+    end
+
+end
+
+pretty(A)
+
+for i in 1:length(P)
+    tick(P[i],P,A)
+    pretty(A)
+    println(i," ",P[i])
+end
