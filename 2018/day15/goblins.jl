@@ -124,8 +124,13 @@ function tick(player,P=P,A=A)
         targets = [lookup_pos(pos + d) for d in CARDINALS if A[pos+d] == enemy]
         m = minimum([P[x]["hits"] for x in targets])
         other = lookup_pos(first(sort([P[x]["pos"] for x in targets if P[x]["hits"] == m])))
-        println("Attack! ", pos, " -> ", P[other]["pos"])
+        # println("Attack! ", pos, " -> ", P[other]["pos"])
         P[other]["hits"] += -ATTACK_STRENGTH
+        if P[other]["hits"] < 1
+            println(other," ",P[other]," is dead!")
+            A[P[other]["pos"]] = '.'
+            delete!(P,other)
+        end
     else
         out = Dict()
         find_paths(pos,out,A)
@@ -153,8 +158,13 @@ function tick(player,P=P,A=A)
                 targets = [lookup_pos(pos + d) for d in CARDINALS if A[pos+d] == enemy]
                 m = minimum([P[x]["hits"] for x in targets])
                 other = lookup_pos(first(sort([P[x]["pos"] for x in targets if P[x]["hits"] == m])))
-                println("Attack! ", pos, " -> ", P[other]["pos"])
+                # println("Attack! ", pos, " -> ", P[other]["pos"])
                 P[other]["hits"] += -ATTACK_STRENGTH
+                if P[other]["hits"] < 1
+                    println(other," ",P[other]," is dead!")
+                    A[P[other]["pos"]] = '.'
+                    delete!(P,other)
+                end        
             end
         end 
         
@@ -167,12 +177,15 @@ end
 
 pretty(A)
 
-for j = 1:7
-    for i in 1:length(P)
+for j = 1:49
+    for i in sort(collect(keys(P)),by=(x->P[x]["pos"]))
         tick(P[i],P,A)
         # pretty(A)
         # println(i," ",P[i])
     end
-    println("Round ",j)
-    pretty(A)
+    if j in 22:28
+        println("Round ",j)
+        pretty(A)
+    end
 end
+pretty(A)
