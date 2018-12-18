@@ -136,16 +136,19 @@ function tick(player,P=P,A=A)
         find_paths(pos,out,A)
 
         # pretty_tree(out)
-
-        r = sort([x for x in union(values(out)...) if x in rangs])
-        println([(x[1],x[2]) for x in r]...)
+        if length(values(out)) > 0
+            r = sort([x for x in union(values(out)...) if x in rangs])
+            # println([(x[1],x[2]) for x in r]...)
+        else
+            r=[]
+        end
 
         if length(r) > 0
             minimum_path  = lineage(out,r[1])
             # println(length(minimum_path)," ",[(x[1],x[2]) for x in minimum_path]...)
             for d in r[2:end]
                 m = lineage(out,d)
-                if (length(m) < length(minimum_path) | ((length(m) == length(minimum_path)) & (m[2] < minimum_path[2])))
+                if (length(m) < length(minimum_path) | ((length(m) == length(minimum_path)) & (m[end] < minimum_path[end])))
                     minimum_path = m 
                 end
                 # println(length(m)," ",[(x[1],x[2]) for x in m]...)
@@ -175,17 +178,34 @@ function tick(player,P=P,A=A)
 
 end
 
-pretty(A)
+function isnotdone(P)
+    return ('G' in [x["ge"] for x in values(P)]) & ('E' in [x["ge"] for x in values(P)])
+end
 
-for j = 1:49
-    for i in sort(collect(keys(P)),by=(x->P[x]["pos"]))
-        tick(P[i],P,A)
+pretty(A)
+rd = 0
+while isnotdone(P)
+    global rd
+    early_break = false
+    remainers = sort(collect(keys(P)),by=(x->P[x]["pos"]))
+    for i in remainers
+        if !isnotdone(P)
+            early_break = true
+            break
+        end
+        if i in keys(P)
+            tick(P[i],P,A)
+        end
         # pretty(A)
         # println(i," ",P[i])
     end
-    if j in 22:28
-        println("Round ",j)
-        pretty(A)
+    if !early_break
+        rd += 1
     end
+    # if rd in 22:28
+    #     println("Round ",rd)
+    #     pretty(A)
+    # end
 end
 pretty(A)
+println(rd," ",[x["hits"] for x in values(P)]," ",rd*sum([x["hits"] for x in values(P)]))
