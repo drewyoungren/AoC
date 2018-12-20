@@ -1,6 +1,7 @@
 filename = (length(ARGS) > 0 ? ARGS[1] : "test.txt")
+attack = (length(ARGS) > 1 ? parse(Int,ARGS[2]) : 3)
 
-ATTACK_STRENGTH = 3
+ATTACK_STRENGTH = Dict('G' => 3,'E' => 3)
 
 debug = false
 
@@ -10,7 +11,19 @@ end
 
 A = [x[j] for j in 1:length(s[1]), x in s]
 
-function pretty(A,P=P)
+playas = 1
+P = Dict{Int,Dict}()
+for j in CartesianIndices(A)
+    global playas
+    if A[j] in ['G','E']
+        P[playas] = Dict("ge" => A[j],"pos" => j,"hits" => 200)
+        playas += 1
+    end
+end
+
+CARDINALS=[CartesianIndex(0,-1),CartesianIndex(-1,0),CartesianIndex(1,0),CartesianIndex(0,1)]
+
+function pretty(A,P)
     for i in 1:size(A,2)
         row_guys =[]
         for j in 1:size(A,1)
@@ -24,21 +37,6 @@ function pretty(A,P=P)
         print("\n")
     end
 end
-
-
-playas = 1
-P = Dict{Int,Dict}()
-for j in CartesianIndices(A)
-    global playas
-    if A[j] in ['G','E']
-        P[playas] = Dict("ge" => A[j],"pos" => j,"hits" => 200)
-        playas += 1
-    end
-end
-
-pretty(A)
-
-CARDINALS=[CartesianIndex(0,-1),CartesianIndex(-1,0),CartesianIndex(1,0),CartesianIndex(0,1)]
 
 function attack_range(player,A=A)
     pos = player["pos"]
@@ -105,7 +103,7 @@ function pretty_tree(out)
     end
 end
 
-function lookup_pos(pos,P=P)
+function lookup_pos(pos,P)
     return first([k for (k,v) in pairs(P) if v["pos"] == pos])
 end
 
@@ -121,11 +119,11 @@ function tick(player,P=P,A=A)
     end
 
     if any([A[pos+d] == enemy for d in CARDINALS])
-        targets = [lookup_pos(pos + d) for d in CARDINALS if A[pos+d] == enemy]
+        targets = [lookup_pos(pos + d,P) for d in CARDINALS if A[pos+d] == enemy]
         m = minimum([P[x]["hits"] for x in targets])
-        other = lookup_pos(first(sort([P[x]["pos"] for x in targets if P[x]["hits"] == m])))
+        other = lookup_pos(first(sort([P[x]["pos"] for x in targets if P[x]["hits"] == m])),P)
         # println("Attack! ", pos, " -> ", P[other]["pos"])
-        P[other]["hits"] += -ATTACK_STRENGTH
+        P[other]["hits"] += -ATTACK_STRENGTH[player["ge"]]
         if P[other]["hits"] < 1
             println(other," ",P[other]," is dead!")
             A[P[other]["pos"]] = '.'
@@ -158,11 +156,11 @@ function tick(player,P=P,A=A)
             player["pos"] = pos
             A[minimum_path[2]] = player["ge"] 
             if any([A[pos+d] == enemy for d in CARDINALS])
-                targets = [lookup_pos(pos + d) for d in CARDINALS if A[pos+d] == enemy]
+                targets = [lookup_pos(pos + d,P) for d in CARDINALS if A[pos+d] == enemy]
                 m = minimum([P[x]["hits"] for x in targets])
-                other = lookup_pos(first(sort([P[x]["pos"] for x in targets if P[x]["hits"] == m])))
+                other = lookup_pos(first(sort([P[x]["pos"] for x in targets if P[x]["hits"] == m])),P)
                 # println("Attack! ", pos, " -> ", P[other]["pos"])
-                P[other]["hits"] += -ATTACK_STRENGTH
+                P[other]["hits"] += -ATTACK_STRENGTH[player["ge"]]
                 if P[other]["hits"] < 1
                     println(other," ",P[other]," is dead!")
                     A[P[other]["pos"]] = '.'
@@ -182,30 +180,55 @@ function isnotdone(P)
     return ('G' in [x["ge"] for x in values(P)]) & ('E' in [x["ge"] for x in values(P)])
 end
 
-pretty(A)
-rd = 0
-while isnotdone(P)
-    global rd
-    early_break = false
-    remainers = sort(collect(keys(P)),by=(x->P[x]["pos"]))
-    for i in remainers
-        if !isnotdone(P)
-            early_break = true
-            break
+
+function loop2(P,A,attack=3)
+    println("-----")
+    pretty(A,P)
+    ATTACK_STRENGTH['E'] = attack
+    rd = 0
+    ct = length([k for (k,v) in pairs(P) if v["ge"] == 'E'])
+    while isnotdone(P)
+        # global rd
+        early_break = false
+        remainers = sort(collect(keys(P)),by=(x->P[x]["pos"]))
+        for i in remainers
+            if !isnotdone(P)
+                early_break = true
+                break
+            end
+            if i in keys(P)
+                tick(P[i],P,A)
+            end
         end
-        if i in keys(P)
-            tick(P[i],P,A)
+        if !early_break
+            rd += 1
         end
-        # pretty(A)
-        # println(i," ",P[i])
     end
-    if !early_break
-        rd += 1
-    end
-    # if rd in 22:28
-    #     println("Round ",rd)
-    #     pretty(A)
-    # end
+    pretty(A,P)
+    println(rd," ",[x["hits"] for x in values(P)]," ",rd*sum([x["hits"] for x in values(P)]))
+    return ct - length([k for (k,v) in pairs(P) if v["ge"] == 'E'])
 end
-pretty(A)
-println(rd," ",[x["hits"] for x in values(P)]," ",rd*sum([x["hits"] for x in values(P)]))
+
+elves = loop2(P,A,attack)
+
+#     elves = loop2(P,A)
+println("Elves lost: ",elves," attack ",ATTACK_STRENGTH['E'])
+
+
+# attack = [200]
+# notdone = false
+# while notdone
+#     global elves,attack,notdone
+#     A = [x[j] for j in 1:length(s[1]), x in s]
+#     playas = 1
+#     P = Dict()
+#     for j in CartesianIndices(A)
+#         if A[j] in ['G','E']
+#             P[playas] = Dict("ge" => A[j],"pos" => j,"hits" => 200)
+#             playas += 1
+#         end
+#     end
+#     ATTACK_STRENGTH['E'] += 1
+#     elves = loop2(P,A)
+#     println("Elves lost: ",elves," attack ",ATTACK_STRENGTH['E'])
+# end
